@@ -45,7 +45,7 @@ android.accept_sdk_license = True
 android.archs = arm64-v8a
 
 # (str) Application versioning (method 1)
-version.filename = %(source.dir)s/version.txt
+version = 1.0.0
 
 # (int) Log level (0 = error only, 1 = info, 2 = debug and gigatons of toast)
 log_level = 2
