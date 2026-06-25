@@ -1,0 +1,18 @@
+{
+  "IMAGE_API_URL": "https://api.openai.com/v1/images/generations",
+  "CHAT_API_URL": "https://api.openai.com/v1/chat/completions",
+  "DEFAULT_API_TOKEN": "",
+  "MODEL_HISTORY": [
+    "gpt-image-2",
+    "gpt-image-2-pro",
+    "flux-dev",
+    "2"
+  ],
+  "LAST_USED_MODEL": "2",
+  "DEFAULT_QUALITY": "low",
+  "AUTO_RETRY": false,
+  "RETRY_COUNT": 3,
+  "LANGUAGE": "zh",
+  "DARK_THEME": false,
+  "PROXY_URL": ""
+}

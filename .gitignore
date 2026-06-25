@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller / PySide build files
+build/
+dist/
+*.spec
+
+# Application outputs and logs
+output/
+
+# Buildozer and Android build artifacts
+.buildozer/
+android_version/bin/
+android_version/.buildozer/
+android_version/__pycache__/
+
+# IDE and system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
