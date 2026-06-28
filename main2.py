@@ -1337,6 +1337,29 @@ class MainWindow(QMainWindow):
         prompt_adv_tab = QWidget()
         prompt_adv_layout = QVBoxLayout(prompt_adv_tab)
 
+        # Model selection widget in Prompt Advanced Tab
+        self.adv_model_group = QGroupBox(t("model_group"))
+        adv_model_form = QFormLayout(self.adv_model_group)
+        self.cb_adv_model = QComboBox()
+        self.cb_adv_model.setEditable(True)
+        self.cb_adv_model.addItems(config_data["MODEL_HISTORY"])
+        self.cb_adv_model.setCurrentText(config_data["LAST_USED_MODEL"])
+        
+        self.cb_adv_model.currentTextChanged.connect(self.sync_model_selectors_from_adv)
+        self.cb_model.currentTextChanged.connect(self.sync_model_selectors_from_main)
+
+        self.btn_adv_fetch_models = QPushButton("🔄")
+        self.btn_adv_fetch_models.setToolTip("自动从中转站拉取可用模型")
+        self.btn_adv_fetch_models.setFixedWidth(40)
+        self.btn_adv_fetch_models.clicked.connect(self.on_fetch_models)
+        
+        adv_model_layout = QHBoxLayout()
+        adv_model_layout.addWidget(self.cb_adv_model, stretch=1)
+        adv_model_layout.addWidget(self.btn_adv_fetch_models)
+        
+        adv_model_form.addRow(QLabel(t("model_label")), adv_model_layout)
+        prompt_adv_layout.addWidget(self.adv_model_group)
+
         preview_group = QGroupBox(t("prompt_preview_group"))
         preview_layout = QVBoxLayout(preview_group)
 
@@ -1586,6 +1609,12 @@ class MainWindow(QMainWindow):
                 QDialog {{
                     background-color: rgba(30, 20, 40, 255);
                 }}
+                QMessageBox {
+                    background-color: rgba(30, 20, 40, 255);
+                }
+                QMessageBox QLabel {
+                    color: #f0e6ff;
+                }
                 QMenu::item {{
                     padding: 6px 20px;
                     background-color: transparent;
@@ -1699,6 +1728,12 @@ class MainWindow(QMainWindow):
                 QDialog {{
                     background-color: #f0f8ff;
                 }}
+                QMessageBox {
+                    background-color: #f0f8ff;
+                }
+                QMessageBox QLabel {
+                    color: #003b59;
+                }
             """)
             self.set_native_titlebar_color(dark=False)
 
@@ -2206,6 +2241,16 @@ class MainWindow(QMainWindow):
         self.btn_generate.setEnabled(enabled)
         self.btn_select_ref.setEnabled(enabled)
 
+    def sync_model_selectors_from_adv(self, text):
+        self.cb_model.blockSignals(True)
+        self.cb_model.setCurrentText(text)
+        self.cb_model.blockSignals(False)
+
+    def sync_model_selectors_from_main(self, text):
+        self.cb_adv_model.blockSignals(True)
+        self.cb_adv_model.setCurrentText(text)
+        self.cb_adv_model.blockSignals(False)
+
     def on_fetch_models(self):
         chat_url = self.txt_chat_api_url.text().strip()
         chat_token = self.txt_chat_api_token.text().strip()
@@ -2218,25 +2263,43 @@ class MainWindow(QMainWindow):
 
         self.btn_fetch_models.setEnabled(False)
         self.btn_fetch_models.setText("...")
+        self.btn_adv_fetch_models.setEnabled(False)
+        self.btn_adv_fetch_models.setText("...")
         self.lbl_status.setText("正在获取模型列表...")
 
         self.fetch_thread = ModelFetchThread(chat_url, chat_token, self.proxy_url_val)
         self.fetch_thread.success.connect(self.handle_fetch_models_success)
         self.fetch_thread.error.connect(self.handle_fetch_models_error)
-        self.fetch_thread.finished.connect(lambda: self.btn_fetch_models.setEnabled(True))
-        self.fetch_thread.finished.connect(lambda: self.btn_fetch_models.setText("🔄"))
+        
+        def on_finished():
+            self.btn_fetch_models.setEnabled(True)
+            self.btn_fetch_models.setText("🔄")
+            self.btn_adv_fetch_models.setEnabled(True)
+            self.btn_adv_fetch_models.setText("🔄")
+        self.fetch_thread.finished.connect(on_finished)
         self.fetch_thread.start()
 
     def handle_fetch_models_success(self, models):
         self.cb_model.blockSignals(True)
+        self.cb_adv_model.blockSignals(True)
+        
         current = self.cb_model.currentText()
+        
         self.cb_model.clear()
+        self.cb_adv_model.clear()
+        
         self.cb_model.addItems(models)
+        self.cb_adv_model.addItems(models)
+        
         if current in models:
             self.cb_model.setCurrentText(current)
+            self.cb_adv_model.setCurrentText(current)
         elif models:
             self.cb_model.setCurrentIndex(0)
+            self.cb_adv_model.setCurrentIndex(0)
+            
         self.cb_model.blockSignals(False)
+        self.cb_adv_model.blockSignals(False)
         
         # Update config history as well
         config_data["MODEL_HISTORY"] = models

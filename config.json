@@ -1,0 +1,30 @@
+{
+  "IMAGE_API_URL": "https://api.openai.com/v1/images/generations",
+  "CHAT_API_URL": "https://api.openai.com/v1/chat/completions",
+  "DEFAULT_API_TOKEN": "",
+  "IMAGE_API_TOKEN": "",
+  "CHAT_API_TOKEN": "",
+  "PROXY_URL": "",
+  "API_PROFILES": [
+    {
+      "name": "默认配置 (Default)",
+      "image_url": "https://api.openai.com/v1/images/generations",
+      "chat_url": "https://api.openai.com/v1/chat/completions",
+      "image_token": "",
+      "chat_token": "",
+      "token": ""
+    }
+  ],
+  "MODEL_HISTORY": [
+    "gpt-image-2",
+    "gpt-image-2-pro",
+    "flux-dev"
+  ],
+  "LAST_USED_MODEL": "gpt-image-2",
+  "DEFAULT_QUALITY": "low",
+  "AUTO_RETRY": false,
+  "RETRY_COUNT": 3,
+  "LANGUAGE": "zh",
+  "DARK_THEME": false,
+  "CURRENT_PROFILE_INDEX": 0
+}
