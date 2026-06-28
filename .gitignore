@@ -1,0 +1,6 @@
+.idea/
+.vscode/
+.gradle/
+*.log
+local.properties
+.DS_Store
