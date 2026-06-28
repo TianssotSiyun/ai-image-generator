@@ -137,6 +137,8 @@ LANG = {
         "adv_status_optimizing": "状态: 正在通过 AI 优化...",
         "proxy_label": "代理设置:",
         "proxy_placeholder": "例如: http://127.0.0.1:7890 (留空为系统默认)",
+        "image_token": "Image 令牌:",
+        "chat_token": "Chat 令牌:",
     },
     "en": {
         "title": "AI Desktop Image Generator",
@@ -227,6 +229,8 @@ LANG = {
         "adv_status_optimizing": "Status: Optimizing via AI...",
         "proxy_label": "Proxy:",
         "proxy_placeholder": "e.g., http://127.0.0.1:7890 (leave empty for system default)",
+        "image_token": "Image Token:",
+        "chat_token": "Chat Token:",
     }
 }
 
@@ -301,7 +305,17 @@ config_data = load_config()
 config_data.setdefault("IMAGE_API_URL", "https://api.openai.com/v1/images/generations")
 config_data.setdefault("CHAT_API_URL", "https://api.openai.com/v1/chat/completions")
 config_data.setdefault("DEFAULT_API_TOKEN", "")
+config_data.setdefault("IMAGE_API_TOKEN", config_data.get("DEFAULT_API_TOKEN", ""))
+config_data.setdefault("CHAT_API_TOKEN", config_data.get("DEFAULT_API_TOKEN", ""))
 config_data.setdefault("PROXY_URL", "")
+config_data.setdefault("API_PROFILES", [{
+    "name": "默认配置 (Default)",
+    "image_url": config_data.get("IMAGE_API_URL", ""),
+    "chat_url": config_data.get("CHAT_API_URL", ""),
+    "image_token": config_data.get("IMAGE_API_TOKEN", ""),
+    "chat_token": config_data.get("CHAT_API_TOKEN", ""),
+    "token": config_data.get("DEFAULT_API_TOKEN", "")
+}])
 
 # Clean up deprecated models from history
 if "MODEL_HISTORY" in config_data:
@@ -700,6 +714,61 @@ class PromptProcessThread(QThread):
         except Exception as e:
             self.error.emit(str(e))
             self.status.emit("Error")
+
+
+class ModelFetchThread(QThread):
+    success = Signal(list)
+    error = Signal(str)
+
+    def __init__(self, api_url, token, proxy_url=None):
+        super().__init__()
+        self.api_url = api_url
+        self.token = token
+        self.proxy_url = proxy_url
+
+    def run(self):
+        try:
+            url = self.api_url
+            if url.endswith("/chat/completions"):
+                url = url.replace("/chat/completions", "/models")
+            elif url.endswith("/chat/completions/"):
+                url = url.replace("/chat/completions/", "/models")
+            elif url.endswith("/images/generations"):
+                url = url.replace("/images/generations", "/models")
+            elif url.endswith("/images/generations/"):
+                url = url.replace("/images/generations/", "/models")
+            else:
+                url = url.rstrip("/") + "/models"
+
+            headers = {
+                "Authorization": f"Bearer {self.token}",
+                "Content-Type": "application/json"
+            }
+            session = requests.Session()
+            if self.proxy_url:
+                session.proxies = {
+                    "http": self.proxy_url,
+                    "https": self.proxy_url
+                }
+            else:
+                sys_proxies = urllib.request.getproxies()
+                if sys_proxies:
+                    session.proxies.update(sys_proxies)
+
+            response = session.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            res_data = response.json()
+
+            model_list = []
+            if 'data' in res_data:
+                for item in res_data['data']:
+                    if 'id' in item:
+                        model_list.append(item['id'])
+            
+            model_list.sort()
+            self.success.emit(model_list)
+        except Exception as e:
+            self.error.emit(str(e))
 
 
 class HistoryItemWidget(QWidget):
@@ -1141,21 +1210,25 @@ class MainWindow(QMainWindow):
         api_form.addRow(QLabel("API 配置预设:"), profile_layout)
 
         self.txt_image_api_url = QLineEdit()
+        self.txt_image_api_token = QLineEdit()
+        self.txt_image_api_token.setEchoMode(QLineEdit.Password)
         self.txt_chat_api_url = QLineEdit()
-        self.txt_api_token = QLineEdit()
-        self.txt_api_token.setEchoMode(QLineEdit.Password)
+        self.txt_chat_api_token = QLineEdit()
+        self.txt_chat_api_token.setEchoMode(QLineEdit.Password)
         self.txt_proxy = QLineEdit()
         self.txt_proxy.setText(self.proxy_url_val)
         self.txt_proxy.setPlaceholderText(t("proxy_placeholder"))
         
         self.lbl_image_path = QLabel(t("image_path"))
         self.lbl_chat_path = QLabel(t("chat_path"))
-        self.lbl_api_token = QLabel(t("api_token"))
+        self.lbl_image_token = QLabel(t("image_token"))
+        self.lbl_chat_token = QLabel(t("chat_token"))
         self.lbl_proxy = QLabel(t("proxy_label"))
         
         api_form.addRow(self.lbl_image_path, self.txt_image_api_url)
+        api_form.addRow(self.lbl_image_token, self.txt_image_api_token)
         api_form.addRow(self.lbl_chat_path, self.txt_chat_api_url)
-        api_form.addRow(self.lbl_api_token, self.txt_api_token)
+        api_form.addRow(self.lbl_chat_token, self.txt_chat_api_token)
         api_form.addRow(self.lbl_proxy, self.txt_proxy)
         gen_layout.addWidget(self.api_group)
         
@@ -1171,8 +1244,17 @@ class MainWindow(QMainWindow):
         self.cb_model.addItems(config_data["MODEL_HISTORY"])
         self.cb_model.setCurrentText(config_data["LAST_USED_MODEL"])
         
+        self.btn_fetch_models = QPushButton("🔄")
+        self.btn_fetch_models.setToolTip("自动从中转站拉取可用模型")
+        self.btn_fetch_models.setFixedWidth(40)
+        self.btn_fetch_models.clicked.connect(self.on_fetch_models)
+        
+        model_layout = QHBoxLayout()
+        model_layout.addWidget(self.cb_model, stretch=1)
+        model_layout.addWidget(self.btn_fetch_models)
+        
         self.lbl_model_label = QLabel(t("model_label"))
-        model_form.addRow(self.lbl_model_label, self.cb_model)
+        model_form.addRow(self.lbl_model_label, model_layout)
         gen_layout.addWidget(self.model_group)
 
         self.prompt_group = QGroupBox(t("prompt_group"))
@@ -1637,7 +1719,8 @@ class MainWindow(QMainWindow):
             p = config_data["API_PROFILES"][idx]
             self.txt_image_api_url.setText(p.get("image_url", ""))
             self.txt_chat_api_url.setText(p.get("chat_url", ""))
-            self.txt_api_token.setText(p.get("token", ""))
+            self.txt_image_api_token.setText(p.get("image_token", p.get("token", "")))
+            self.txt_chat_api_token.setText(p.get("chat_token", p.get("token", "")))
             config_data["CURRENT_PROFILE_INDEX"] = idx
 
     def on_save_api_profile(self):
@@ -1670,14 +1753,18 @@ class MainWindow(QMainWindow):
             if existing:
                 existing["image_url"] = self.txt_image_api_url.text().strip()
                 existing["chat_url"] = self.txt_chat_api_url.text().strip()
-                existing["token"] = self.txt_api_token.text().strip()
+                existing["image_token"] = self.txt_image_api_token.text().strip()
+                existing["chat_token"] = self.txt_chat_api_token.text().strip()
+                existing["token"] = self.txt_image_api_token.text().strip()
                 config_data["CURRENT_PROFILE_INDEX"] = profiles.index(existing)
             else:
                 profiles.append({
                     "name": name,
                     "image_url": self.txt_image_api_url.text().strip(),
                     "chat_url": self.txt_chat_api_url.text().strip(),
-                    "token": self.txt_api_token.text().strip()
+                    "image_token": self.txt_image_api_token.text().strip(),
+                    "chat_token": self.txt_chat_api_token.text().strip(),
+                    "token": self.txt_image_api_token.text().strip()
                 })
                 config_data["CURRENT_PROFILE_INDEX"] = len(profiles) - 1
             self.update_api_profiles_ui()
@@ -1720,7 +1807,8 @@ class MainWindow(QMainWindow):
         
         self.lbl_image_path.setText(t("image_path"))
         self.lbl_chat_path.setText(t("chat_path"))
-        self.lbl_api_token.setText(t("api_token"))
+        self.lbl_image_token.setText(t("image_token"))
+        self.lbl_chat_token.setText(t("chat_token"))
         self.lbl_model_label.setText(t("model_label"))
         self.lbl_size_label.setText(t("size_label"))
         self.lbl_quality_label.setText(t("quality_label"))
@@ -1848,8 +1936,10 @@ class MainWindow(QMainWindow):
         if not original_text:
             return
         
-        api_token = self.txt_api_token.text().strip()
-        if not api_token:
+        chat_token = self.txt_chat_api_token.text().strip()
+        if not chat_token:
+            chat_token = self.txt_image_api_token.text().strip()
+        if not chat_token:
             self.lbl_adv_status.setText(t("empty_token"))
             return
 
@@ -1860,7 +1950,7 @@ class MainWindow(QMainWindow):
 
         self.prompt_worker = PromptProcessThread(
             api_url=self.txt_chat_api_url.text().strip(),
-            token=api_token,
+            token=chat_token,
             model=self.cb_model.currentText().strip(),
             prompt=original_text,
             task_type="translate",
@@ -1876,8 +1966,10 @@ class MainWindow(QMainWindow):
         if not original_text:
             return
         
-        api_token = self.txt_api_token.text().strip()
-        if not api_token:
+        chat_token = self.txt_chat_api_token.text().strip()
+        if not chat_token:
+            chat_token = self.txt_image_api_token.text().strip()
+        if not chat_token:
             self.lbl_adv_status.setText(t("empty_token"))
             return
 
@@ -1888,7 +1980,7 @@ class MainWindow(QMainWindow):
 
         self.prompt_worker = PromptProcessThread(
             api_url=self.txt_chat_api_url.text().strip(),
-            token=api_token,
+            token=chat_token,
             model=self.cb_model.currentText().strip(),
             prompt=original_text,
             task_type="optimize",
@@ -2042,8 +2134,14 @@ class MainWindow(QMainWindow):
 
         mode = "image" if self.ref_image_paths else "text"
 
-        api_token = self.txt_api_token.text().strip()
-        if not api_token:
+        image_token = self.txt_image_api_token.text().strip()
+        chat_token = self.txt_chat_api_token.text().strip()
+
+        target_token = chat_token if mode == "image" else image_token
+        if not target_token:
+            target_token = image_token if mode == "image" else chat_token
+
+        if not target_token:
             self.lbl_status.setText(t("status_blocked"))
             self.lbl_result_img.setText(t("empty_token"))
             return
@@ -2059,13 +2157,13 @@ class MainWindow(QMainWindow):
         retry_count = self.spin_retry_count.value()
 
         self.proxy_url_val = self.txt_proxy.text().strip()
-        self.save_current_config(current_model, api_token, current_quality, auto_retry, retry_count)
+        self.save_current_config(current_model, image_token, chat_token, current_quality, auto_retry, retry_count)
 
         self.worker = ImageGenerateThread(
             mode=mode, api_url=None,
             image_api_url=self.txt_image_api_url.text().strip(),
             chat_api_url=self.txt_chat_api_url.text().strip(),
-            token=api_token, model=current_model, prompt=current_prompt,
+            token=target_token, model=current_model, prompt=current_prompt,
             size=self.cb_size.currentText(), quality=current_quality,
             ref_image_paths=self.ref_image_paths if mode == "image" else [],
             auto_retry=auto_retry, retry_count=retry_count,
@@ -2078,7 +2176,7 @@ class MainWindow(QMainWindow):
         self.worker.finished.connect(self.generation_finished)
         self.worker.start()
 
-    def save_current_config(self, model, token, quality, auto_retry, retry_count):
+    def save_current_config(self, model, image_token, chat_token, quality, auto_retry, retry_count):
         try:
             self.proxy_url_val = self.txt_proxy.text().strip()
             history = config_data.get("MODEL_HISTORY", DEFAULT_MODELS.copy())
@@ -2087,7 +2185,9 @@ class MainWindow(QMainWindow):
             config_data.update({
                 "IMAGE_API_URL": self.txt_image_api_url.text().strip(),
                 "CHAT_API_URL": self.txt_chat_api_url.text().strip(),
-                "DEFAULT_API_TOKEN": token,
+                "IMAGE_API_TOKEN": image_token,
+                "CHAT_API_TOKEN": chat_token,
+                "DEFAULT_API_TOKEN": image_token,
                 "LAST_USED_MODEL": model,
                 "MODEL_HISTORY": history,
                 "DEFAULT_QUALITY": quality,
@@ -2105,6 +2205,49 @@ class MainWindow(QMainWindow):
     def toggle_buttons(self, enabled):
         self.btn_generate.setEnabled(enabled)
         self.btn_select_ref.setEnabled(enabled)
+
+    def on_fetch_models(self):
+        chat_url = self.txt_chat_api_url.text().strip()
+        chat_token = self.txt_chat_api_token.text().strip()
+        if not chat_token:
+            chat_token = self.txt_image_api_token.text().strip()
+
+        if not chat_url or not chat_token:
+            QMessageBox.warning(self, t("confirm_title"), "请先配置 Chat 路径或 API Token")
+            return
+
+        self.btn_fetch_models.setEnabled(False)
+        self.btn_fetch_models.setText("...")
+        self.lbl_status.setText("正在获取模型列表...")
+
+        self.fetch_thread = ModelFetchThread(chat_url, chat_token, self.proxy_url_val)
+        self.fetch_thread.success.connect(self.handle_fetch_models_success)
+        self.fetch_thread.error.connect(self.handle_fetch_models_error)
+        self.fetch_thread.finished.connect(lambda: self.btn_fetch_models.setEnabled(True))
+        self.fetch_thread.finished.connect(lambda: self.btn_fetch_models.setText("🔄"))
+        self.fetch_thread.start()
+
+    def handle_fetch_models_success(self, models):
+        self.cb_model.blockSignals(True)
+        current = self.cb_model.currentText()
+        self.cb_model.clear()
+        self.cb_model.addItems(models)
+        if current in models:
+            self.cb_model.setCurrentText(current)
+        elif models:
+            self.cb_model.setCurrentIndex(0)
+        self.cb_model.blockSignals(False)
+        
+        # Update config history as well
+        config_data["MODEL_HISTORY"] = models
+        save_config(config_data)
+
+        self.lbl_status.setText(f"成功获取 {len(models)} 个模型")
+        QMessageBox.information(self, "成功", f"成功拉取到 {len(models)} 个可用模型！")
+
+    def handle_fetch_models_error(self, err):
+        self.lbl_status.setText("拉取模型失败")
+        QMessageBox.critical(self, "错误", f"获取模型列表失败: {err}")
 
     def handle_error(self, err_msg, prompt, metadata=None):
         self.result_stack.setCurrentIndex(0)
