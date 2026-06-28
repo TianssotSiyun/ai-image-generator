@@ -14,6 +14,14 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString("chat_api_url", "https://api.openai.com/v1/chat/completions") ?: ""
         set(value) = prefs.edit().putString("chat_api_url", value).apply()
 
+    var imageApiToken: String
+        get() = prefs.getString("image_api_token", "") ?: prefs.getString("api_token", "") ?: ""
+        set(value) = prefs.edit().putString("image_api_token", value).apply()
+
+    var chatApiToken: String
+        get() = prefs.getString("chat_api_token", "") ?: prefs.getString("api_token", "") ?: ""
+        set(value) = prefs.edit().putString("chat_api_token", value).apply()
+
     var apiToken: String
         get() = prefs.getString("api_token", "") ?: ""
         set(value) = prefs.edit().putString("api_token", value).apply()

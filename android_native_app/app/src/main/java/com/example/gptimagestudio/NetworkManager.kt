@@ -288,4 +288,51 @@ object NetworkManager {
             Result.failure(e)
         }
     }
+
+    suspend fun fetchModels(apiUrl: String, token: String): Result<List<String>> = withContext(Dispatchers.IO) {
+        try {
+            val modelsUrl = if (apiUrl.endsWith("/chat/completions")) {
+                apiUrl.replace("/chat/completions", "/models")
+            } else if (apiUrl.endsWith("/chat/completions/")) {
+                apiUrl.replace("/chat/completions/", "/models")
+            } else if (apiUrl.endsWith("/images/generations")) {
+                apiUrl.replace("/images/generations", "/models")
+            } else if (apiUrl.endsWith("/images/generations/")) {
+                apiUrl.replace("/images/generations/", "/models")
+            } else {
+                if (apiUrl.endsWith("/")) "${apiUrl}models" else "$apiUrl/models"
+            }
+
+            val request = Request.Builder()
+                .url(modelsUrl)
+                .addHeader("Authorization", "Bearer $token")
+                .get()
+                .build()
+
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                val err = response.body?.string() ?: "Unknown error"
+                return@withContext Result.failure(Exception("HTTP Error ${response.code}: $err"))
+            }
+
+            val bodyStr = response.body?.string() ?: ""
+            val resObj = JSONObject(bodyStr)
+            val modelList = mutableListOf<String>()
+
+            if (resObj.has("data")) {
+                val dataArr = resObj.getJSONArray("data")
+                for (i in 0 until dataArr.length()) {
+                    val modelItem = dataArr.getJSONObject(i)
+                    if (modelItem.has("id")) {
+                        modelList.add(modelItem.getString("id"))
+                    }
+                }
+            }
+
+            modelList.sort()
+            Result.success(modelList)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

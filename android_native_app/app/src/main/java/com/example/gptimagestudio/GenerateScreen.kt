@@ -57,7 +57,8 @@ fun GenerateScreen(
                         "name" to obj.optString("name", "默认配置"),
                         "image_url" to obj.optString("image_url", ""),
                         "chat_url" to obj.optString("chat_url", ""),
-                        "token" to obj.optString("token", "")
+                        "image_token" to obj.optString("image_token", obj.optString("token", "")),
+                        "chat_token" to obj.optString("chat_token", obj.optString("token", ""))
                     )
                 }
             } catch (e: Exception) { emptyList() }
@@ -70,7 +71,8 @@ fun GenerateScreen(
                 "name" to "默认配置 (Default)",
                 "image_url" to prefs.imageApiUrl,
                 "chat_url" to prefs.chatApiUrl,
-                "token" to prefs.apiToken
+                "image_token" to prefs.imageApiToken,
+                "chat_token" to prefs.chatApiToken
             )
             apiProfiles = listOf(defaultProfile)
             val arr = JSONArray()
@@ -85,8 +87,14 @@ fun GenerateScreen(
 
     var apiUrl by remember { mutableStateOf(prefs.imageApiUrl) }
     var chatUrl by remember { mutableStateOf(prefs.chatApiUrl) }
-    var apiToken by remember { mutableStateOf(prefs.apiToken) }
+    var imageToken by remember { mutableStateOf(prefs.imageApiToken) }
+    var chatToken by remember { mutableStateOf(prefs.chatApiToken) }
     var model by remember { mutableStateOf(prefs.selectedModel) }
+
+    // Dynamic Models dropdown list
+    var fetchedModels by remember { mutableStateOf<List<String>>(emptyList()) }
+    var expandedModelDropdown by remember { mutableStateOf(false) }
+    var isFetchingModels by remember { mutableStateOf(false) }
     
     // Sync current profile to inputs
     LaunchedEffect(currentProfileIndex, apiProfiles) {
@@ -94,7 +102,8 @@ fun GenerateScreen(
             val p = apiProfiles[currentProfileIndex]
             apiUrl = p["image_url"] ?: ""
             chatUrl = p["chat_url"] ?: ""
-            apiToken = p["token"] ?: ""
+            imageToken = p["image_token"] ?: p["token"] ?: ""
+            chatToken = p["chat_token"] ?: p["token"] ?: ""
         }
     }
 
@@ -165,7 +174,13 @@ fun GenerateScreen(
                         if (name.isNotEmpty()) {
                             val newList = apiProfiles.toMutableList()
                             val existingIdx = newList.indexOfFirst { it["name"] == name }
-                            val newProf = mapOf("name" to name, "image_url" to apiUrl, "chat_url" to chatUrl, "token" to apiToken)
+                            val newProf = mapOf(
+                                "name" to name,
+                                "image_url" to apiUrl,
+                                "chat_url" to chatUrl,
+                                "image_token" to imageToken,
+                                "chat_token" to chatToken
+                            )
                             if (existingIdx != -1) {
                                 newList[existingIdx] = newProf
                                 currentProfileIndex = existingIdx
@@ -245,23 +260,7 @@ fun GenerateScreen(
                     }
                 }
 
-                OutlinedTextField(
-                    value = apiToken, onValueChange = { 
-                        apiToken = it; prefs.apiToken = it 
-                        // Update current profile in memory and prefs silently
-                        if (apiProfiles.isNotEmpty() && currentProfileIndex in apiProfiles.indices) {
-                            val newList = apiProfiles.toMutableList()
-                            val map = newList[currentProfileIndex].toMutableMap()
-                            map["token"] = it
-                            newList[currentProfileIndex] = map
-                            apiProfiles = newList
-                            val arr = JSONArray()
-                            newList.forEach { p -> arr.put(JSONObject(p)) }
-                            prefs.apiProfilesJson = arr.toString()
-                        }
-                    },
-                    label = { Text("API Token") }, modifier = Modifier.fillMaxWidth(), singleLine = true
-                )
+                // Image API Configuration
                 OutlinedTextField(
                     value = apiUrl, onValueChange = { 
                         apiUrl = it; prefs.imageApiUrl = it 
@@ -276,8 +275,28 @@ fun GenerateScreen(
                             prefs.apiProfilesJson = arr.toString()
                         }
                     },
-                    label = { Text("Image 路径") }, modifier = Modifier.fillMaxWidth(), singleLine = true
+                    label = { Text("Image 路径 (生图端点)") }, modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
+                OutlinedTextField(
+                    value = imageToken, onValueChange = { 
+                        imageToken = it; prefs.imageApiToken = it 
+                        if (apiProfiles.isNotEmpty() && currentProfileIndex in apiProfiles.indices) {
+                            val newList = apiProfiles.toMutableList()
+                            val map = newList[currentProfileIndex].toMutableMap()
+                            map["image_token"] = it
+                            newList[currentProfileIndex] = map
+                            apiProfiles = newList
+                            val arr = JSONArray()
+                            newList.forEach { p -> arr.put(JSONObject(p)) }
+                            prefs.apiProfilesJson = arr.toString()
+                        }
+                    },
+                    label = { Text("Image API Token (生图令牌)") }, modifier = Modifier.fillMaxWidth(), singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Chat API Configuration
                 OutlinedTextField(
                     value = chatUrl, onValueChange = { 
                         chatUrl = it; prefs.chatApiUrl = it
@@ -292,12 +311,91 @@ fun GenerateScreen(
                             prefs.apiProfilesJson = arr.toString()
                         }
                     },
-                    label = { Text("Chat 路径 (用于翻译/优化)") }, modifier = Modifier.fillMaxWidth(), singleLine = true
+                    label = { Text("Chat 路径 (对话端点/用于翻译优化)") }, modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
                 OutlinedTextField(
-                    value = model, onValueChange = { model = it; prefs.selectedModel = it },
-                    label = { Text("选择/输入模型") }, modifier = Modifier.fillMaxWidth(), singleLine = true
+                    value = chatToken, onValueChange = { 
+                        chatToken = it; prefs.chatApiToken = it 
+                        if (apiProfiles.isNotEmpty() && currentProfileIndex in apiProfiles.indices) {
+                            val newList = apiProfiles.toMutableList()
+                            val map = newList[currentProfileIndex].toMutableMap()
+                            map["chat_token"] = it
+                            newList[currentProfileIndex] = map
+                            apiProfiles = newList
+                            val arr = JSONArray()
+                            newList.forEach { p -> arr.put(JSONObject(p)) }
+                            prefs.apiProfilesJson = arr.toString()
+                        }
+                    },
+                    label = { Text("Chat API Token (对话令牌)") }, modifier = Modifier.fillMaxWidth(), singleLine = true
                 )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Dynamic Model Dropdown selector
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    ExposedDropdownMenuBox(
+                        expanded = expandedModelDropdown && fetchedModels.isNotEmpty(),
+                        onExpandedChange = { expandedModelDropdown = !expandedModelDropdown }
+                    ) {
+                        OutlinedTextField(
+                            value = model,
+                            onValueChange = { model = it; prefs.selectedModel = it },
+                            label = { Text("选择/输入模型") },
+                            modifier = Modifier.fillMaxWidth().menuAnchor(),
+                            singleLine = true,
+                            trailingIcon = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (isFetchingModels) {
+                                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                                    } else {
+                                        IconButton(onClick = {
+                                            var targetToken = chatToken
+                                            if (targetToken.isBlank()) targetToken = imageToken
+                                            if (chatUrl.isBlank() || targetToken.isBlank()) {
+                                                Toast.makeText(context, "请先填入对话 API 路径或 Token", Toast.LENGTH_SHORT).show()
+                                                return@IconButton
+                                            }
+                                            isFetchingModels = true
+                                            scope.launch {
+                                                val res = NetworkManager.fetchModels(chatUrl, targetToken)
+                                                isFetchingModels = false
+                                                if (res.isSuccess) {
+                                                    fetchedModels = res.getOrNull() ?: emptyList()
+                                                    expandedModelDropdown = true
+                                                    Toast.makeText(context, "成功获取 ${fetchedModels.size} 个模型", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, "获取模型失败: ${res.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                                                }
+                                            }
+                                        }) {
+                                            Text("🔄", fontSize = 16.sp)
+                                        }
+                                    }
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedModelDropdown)
+                                }
+                            }
+                        )
+
+                        if (fetchedModels.isNotEmpty()) {
+                            ExposedDropdownMenu(
+                                expanded = expandedModelDropdown,
+                                onDismissRequest = { expandedModelDropdown = false }
+                            ) {
+                                fetchedModels.forEach { m ->
+                                    DropdownMenuItem(
+                                        text = { Text(m) },
+                                        onClick = {
+                                            model = m
+                                            prefs.selectedModel = m
+                                            expandedModelDropdown = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -355,10 +453,15 @@ fun GenerateScreen(
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = {
-                        if (prompt.isBlank() || apiToken.isBlank()) return@Button
+                        var targetToken = chatToken
+                        if (targetToken.isBlank()) targetToken = imageToken
+                        if (prompt.isBlank() || targetToken.isBlank()) {
+                            Toast.makeText(context, "提示词与 API Token 不能为空", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
                         isTranslating = true
                         scope.launch {
-                            val res = NetworkManager.translatePrompt(chatUrl, apiToken, "gpt-4o", prompt)
+                            val res = NetworkManager.translatePrompt(chatUrl, targetToken, if (model.isNotBlank()) model else "gpt-4o", prompt)
                             isTranslating = false
                             if (res.isSuccess) prompt = res.getOrNull() ?: prompt
                             else Toast.makeText(context, "翻译失败", Toast.LENGTH_SHORT).show()
@@ -368,11 +471,16 @@ fun GenerateScreen(
                     }
 
                     Button(onClick = {
-                        if (prompt.isBlank() || apiToken.isBlank()) return@Button
+                        var targetToken = chatToken
+                        if (targetToken.isBlank()) targetToken = imageToken
+                        if (prompt.isBlank() || targetToken.isBlank()) {
+                            Toast.makeText(context, "提示词与 API Token 不能为空", Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
                         isOptimizing = true
                         scope.launch {
                             val optimizePrompt = "You are a midjourney prompt engineer. Optimize the following prompt to be highly detailed and visually descriptive in English. Do not add conversational text, just the optimized prompt: $prompt"
-                            val res = NetworkManager.translatePrompt(chatUrl, apiToken, "gpt-4o", optimizePrompt)
+                            val res = NetworkManager.translatePrompt(chatUrl, targetToken, if (model.isNotBlank()) model else "gpt-4o", optimizePrompt)
                             isOptimizing = false
                             if (res.isSuccess) prompt = res.getOrNull() ?: prompt
                             else Toast.makeText(context, "优化失败", Toast.LENGTH_SHORT).show()
@@ -495,7 +603,12 @@ fun GenerateScreen(
         // Generate Button
         Button(
             onClick = {
-                if (apiToken.isBlank() || prompt.isBlank()) {
+                val isImageToImage = refImageUris.isNotEmpty() || referenceImageInternal != null
+                var targetToken = if (isImageToImage) chatToken else imageToken
+                if (targetToken.isBlank()) {
+                    targetToken = if (isImageToImage) imageToken else chatToken
+                }
+                if (targetToken.isBlank() || prompt.isBlank()) {
                     Toast.makeText(context, "API Token或提示词不能为空", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
@@ -532,7 +645,7 @@ fun GenerateScreen(
                     val targetApiUrl = if (base64Refs.isNotEmpty()) chatUrl else apiUrl
 
                     val result = NetworkManager.generateImage(
-                        apiUrl = targetApiUrl, token = apiToken, model = model,
+                        apiUrl = targetApiUrl, token = targetToken, model = model,
                         prompt = prompt, size = size, quality = quality, 
                         refImageBase64s = base64Refs, n = imageCount
                     )
