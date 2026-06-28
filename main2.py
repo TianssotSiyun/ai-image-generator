@@ -1609,12 +1609,12 @@ class MainWindow(QMainWindow):
                 QDialog {{
                     background-color: rgba(30, 20, 40, 255);
                 }}
-                QMessageBox {
+                QMessageBox {{
                     background-color: rgba(30, 20, 40, 255);
-                }
-                QMessageBox QLabel {
+                }}
+                QMessageBox QLabel {{
                     color: #f0e6ff;
-                }
+                }}
                 QMenu::item {{
                     padding: 6px 20px;
                     background-color: transparent;
@@ -1728,12 +1728,12 @@ class MainWindow(QMainWindow):
                 QDialog {{
                     background-color: #f0f8ff;
                 }}
-                QMessageBox {
+                QMessageBox {{
                     background-color: #f0f8ff;
-                }
-                QMessageBox QLabel {
+                }}
+                QMessageBox QLabel {{
                     color: #003b59;
-                }
+                }}
             """)
             self.set_native_titlebar_color(dark=False)
 
