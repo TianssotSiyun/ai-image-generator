@@ -994,7 +994,7 @@ class HistoryDetailDialog(QDialog):
         
     def on_copy_clicked(self):
         QApplication.clipboard().setText(self.entry.get("prompt", ""))
-        QMessageBox.information(self, "成功", "Prompt 已复制到剪贴板！")
+        self.parent().show_message_box(QMessageBox.Icon.Information, "成功", "Prompt 已复制到剪贴板！")
 
     def set_detail_image(self, path):
         if path and os.path.exists(path):
@@ -1108,6 +1108,58 @@ class MainWindow(QMainWindow):
 
         self.init_ui()
         self.apply_theme()
+
+    def show_message_box(self, icon, title, text, buttons=QMessageBox.Ok, default_button=QMessageBox.Ok):
+        msg = QMessageBox(self)
+        msg.setIcon(icon)
+        msg.setWindowTitle(title)
+        msg.setText(text)
+        msg.setStandardButtons(buttons)
+        msg.setDefaultButton(default_button)
+        if config_data.get("DARK_THEME", False):
+            msg.setStyleSheet("""
+                QMessageBox {
+                    background-color: rgb(30, 20, 40);
+                }
+                QLabel {
+                    color: #f0e6ff;
+                    background: transparent;
+                }
+                QPushButton {
+                    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(110, 45, 180, 200), stop:1 rgba(70, 20, 120, 180));
+                    color: #ffffff;
+                    border: 1px solid rgba(160, 100, 240, 150);
+                    padding: 6px 12px;
+                    border-radius: 6px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(140, 60, 220, 220), stop:1 rgba(90, 30, 150, 200));
+                }
+            """)
+        else:
+            msg.setStyleSheet("""
+                QMessageBox {
+                    background-color: #f0f8ff;
+                    border: 1px solid #003b59;
+                }
+                QLabel {
+                    color: #003b59;
+                    background: transparent;
+                }
+                QPushButton {
+                    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(255, 255, 255, 220), stop:1 rgba(200, 240, 255, 180));
+                    color: #006064;
+                    border: 1px solid rgba(255, 255, 255, 255);
+                    padding: 6px 12px;
+                    border-radius: 6px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(255, 255, 255, 255), stop:1 rgba(150, 220, 255, 200));
+                }
+            """)
+        return msg.exec()
 
     def init_ui(self):
         main_layout = QVBoxLayout()
@@ -1805,8 +1857,14 @@ class MainWindow(QMainWindow):
     def on_delete_api_profile(self):
         idx = self.cb_api_profile.currentIndex()
         if idx >= 0 and len(config_data["API_PROFILES"]) > 1:
-            reply = QMessageBox.question(self, "确认", "确认删除该配置？")
-            if reply == QMessageBox.Yes:
+            reply = self.show_message_box(
+                QMessageBox.Icon.Question,
+                "确认",
+                "确认删除该配置？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
                 config_data["API_PROFILES"].pop(idx)
                 config_data["CURRENT_PROFILE_INDEX"] = 0
                 self.update_api_profiles_ui()
@@ -2256,7 +2314,7 @@ class MainWindow(QMainWindow):
             chat_token = self.txt_image_api_token.text().strip()
 
         if not chat_url or not chat_token:
-            QMessageBox.warning(self, t("confirm_title"), "请先配置 Chat 路径或 API Token")
+            self.show_message_box(QMessageBox.Icon.Warning, t("confirm_title"), "请先配置 Chat 路径或 API Token")
             return
 
         self.btn_fetch_models.setEnabled(False)
@@ -2304,11 +2362,11 @@ class MainWindow(QMainWindow):
         save_config(config_data)
 
         self.lbl_status.setText(f"成功获取 {len(models)} 个模型")
-        QMessageBox.information(self, "成功", f"成功拉取到 {len(models)} 个可用模型！")
+        self.show_message_box(QMessageBox.Icon.Information, "成功", f"成功拉取到 {len(models)} 个可用模型！")
 
     def handle_fetch_models_error(self, err):
         self.lbl_status.setText("拉取模型失败")
-        QMessageBox.critical(self, "错误", f"获取模型列表失败: {err}")
+        self.show_message_box(QMessageBox.Icon.Critical, "错误", f"获取模型列表失败: {err}")
 
     def handle_error(self, err_msg, prompt, metadata=None):
         self.result_stack.setCurrentIndex(0)
@@ -2484,11 +2542,14 @@ class MainWindow(QMainWindow):
             self.lbl_result_img.setPixmap(pixmap.scaled(self.lbl_result_img.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
     def clear_history(self):
-        reply = QMessageBox.question(
-            self, t("confirm_title"), t("confirm_clear"),
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        reply = self.show_message_box(
+            QMessageBox.Icon.Question,
+            t("confirm_title"),
+            t("confirm_clear"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             history_data.clear()
             save_json_file(HISTORY_FILE, history_data)
             self.refresh_history()
