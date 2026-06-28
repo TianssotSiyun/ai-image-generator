@@ -1,57 +1,57 @@
-# AI Image Generator Aero (PC & Android)
+# AI Image Generator Aero (PC & Android 客户端)
 
-A premium, glassmorphic AI Image Generator supporting text-to-image (文生图) and image-to-image (图生图) workflows. Features a synchronized experience across Desktop (Windows) and Mobile (Android v1.1) platforms.
-
----
-
-## 🎨 Core Features | 核心功能
-
-*   **Multi-Image Reference (图生图多选)**: Feed multiple reference images into the model for highly controlled generation. Includes intuitive red close buttons to manage references.
-*   **Batch Image Generation (多图并发)**: Set a target count from 1 to 10 to generate grid results and browse through them with a carousel switcher.
-*   **Token & Efficiency Logging (计费与效率审计)**: Real-time logging of prompt tokens, completion tokens, duration, and the target API URL.
-*   **Robust History & Recovery (防丢失历史记录)**: Physically deleted photos on disk are automatically marked as "Deleted" (已删除) in your gallery. Prompts remain fully copyable and reusable.
-*   **Premium Aero Aesthetics (极客紫黑皮肤)**: Built on glassmorphic card designs with cyberpunk violet neon colors, matching perfectly between PC and Mobile.
+一款采用拟物磨砂玻璃（Glassmorphism）美学设计的 AI 智能图像生成器，支持**文生图**及**图生图**工作流。PC 桌面端（Windows）与移动手机端（Android v1.1）体验完全对齐，均采用极客紫黑配色。
 
 ---
 
-## ⚠️ Important Precautions | 使用注意事项 [极重要]
+## 🎨 核心功能亮点
 
-Before installing and setting up the app, please read these critical usage rules:
-
-1.  **API Token Security (API 密钥安全)**
-    *   **Warning**: The software **does not** come with any built-in keys. You must supply your own API Token.
-    *   Never share your `config.json` file, and avoid uploading screenshots containing your token.
-
-2.  **Image-to-Image Routing Mechanism (图生图端点分流机制)**
-    *   Standard DALL-E endpoints (e.g., `/v1/images/generations`) do not accept image inputs. 
-    *   **Therefore**, whenever reference images are selected, the software **automatically routes the request to your Chat API Url** (e.g., `/v1/chat/completions`).
-    *   **Requirement**: You must ensure your **Chat API** is configured, and the selected **Model** must support vision/multimodal input (e.g., `gpt-4o`, `claude-3-5-sonnet`, `gemini-1.5-flash`). Using a non-vision model for Image-to-Image will cause the request to fail.
-
-3.  **Batch Generation Limits (批量生图额度限制)**
-    *   While the UI allows requesting up to 10 images at once, your API provider might have concurrency limits (Rate Limits) or strict timeout bounds. If you experience timeouts when generating 5+ images, reduce the count or upgrade your API tier.
-
-4.  **Android Storage Permissions (手机存储写入权限)**
-    *   To successfully use "Save to Gallery" (保存到手机相册), you must grant storage/media permissions when prompted by your Android device.
+*   **多参考图融合（图生图多选）**：支持同时选定多张图片作为生图参考。界面提供微型红叉按钮，方便快捷地剔除单张参考图。
+*   **多图并发生成**：支持单次并发生成 1 至 10 张图片，生成后自动呈现在结果预览区，支持底部缩略图轮播切换查看。
+*   **Token 计费与耗时审计**：实时展示并记录每次请求的输入 Token、输出 Token、总消耗 Token 以及 API 请求耗时和请求端口。
+*   **已删除历史防崩溃机制**：当手动删除了磁盘上的生成原图时，图库的历史卡片不会消失，而是标记为“已删除 (Deleted)”，点击仍能正常查看、复制及重新应用当时的提示词（Prompt），且**绝不发生闪退崩溃**。
+*   **自适应拟物玻璃皮肤**：完美适配 PC 电脑版，移动端玻璃卡片带有半透紫黑背景（`rgba(30, 15, 45, 130)`）与霓虹紫发光边框，视觉极具科技感。
 
 ---
 
-## 🚀 Quick Start | 快速上手
+## ⚠️ 极重要：使用注意事项 [避坑指南]
 
-### Desktop Version (Windows)
-1.  Download the latest executable from the [GitHub Releases](https://github.com/TianssotSiyun/ai-image-generator/releases) page.
-2.  Run `AI_Image_Generator.exe`.
-3.  Navigate to **Settings** (设置) to configure your API URL and Token.
-4.  Write your prompt, select reference images if needed, and click **Generate** (生成).
+在使用本软件前，请务必仔细阅读以下使用规则，以防请求失败或造成密钥泄漏：
 
-### Mobile Version (Android)
-1.  Download `AI_Image_Generator_Aero.apk` from the [GitHub Releases](https://github.com/TianssotSiyun/ai-image-generator/releases) page.
-2.  Install it on your Android device (allow installations from unknown sources if prompted).
-3.  Open the App, tap **Settings** in the top right to configure your API profiles.
-4.  Enjoy generating images on-the-go!
+1.  **API Key 令牌与额度安全**
+    *   **警告**：本软件**不内置**任何 API Key 密钥。您必须在设置中填入您自己的 API Token 才能使用。
+    *   请不要将带有您专属 Key 的配置文件（如 `config.json`）共享给他人，或在截图、视频中暴露您的 Token 密文。
+
+2.  **图生图（Image-to-Image）自动强切 Chat 接口通道机制**
+    *   由于标准的 DALL-E 图像生成接口（如 `/v1/images/generations`）无法接受参考图片输入。
+    *   **因此**，只要您在界面中添加了任何参考图（图生图模式），系统**会自动将请求路径重定向到您的 Chat API 地址**（如 `/v1/chat/completions`）。
+    *   **硬性要求**：在此模式下，您必须确保设置了有效的 **Chat API 地址**，且选定的**生图模型**必须具备**视觉/多模态理解能力**（例如：`gpt-4o`、`claude-3-5-sonnet` 或 `gemini-1.5-flash`）。若选用不支持多模态的纯文本模型进行图生图，接口将会报错。
+
+3.  **批量并发数量限制**
+    *   虽然界面支持 1~10 张图的并发选择，但您的 API 代理商可能有严苛的单并发限制或网络超时截断。如果批量生成 5 张以上频繁遇到超时，请适当调低生成数量，或升级您的 API 服务级别。
+
+4.  **安卓端相册写入权限**
+    *   为了能够成功使用“保存到系统相册”功能，在手机弹出存储/媒体写入权限申请时，请务必选择“允许”。
 
 ---
 
-## 🛠️ Project Structure | 源码结构
+## 🚀 快速上手说明
 
-*   `/main2.py`: Python PySide6 source code for the Windows application.
-*   `/android_native_app/`: Android Studio native project source code built using Kotlin & Jetpack Compose.
+### PC 桌面版 (Windows)
+1.  进入 [GitHub Releases](https://github.com/TianssotSiyun/ai-image-generator/releases) 页面下载最新版的 `.exe` 压缩包或执行文件。
+2.  运行 `AI_Image_Generator.exe`。
+3.  点击界面上的 **设置 (Settings)**，配置您的 API 地址及 API Key。
+4.  输入 Prompt 提示词，（可选）添加参考图，点击 **生成图像**。
+
+### 移动手机版 (Android)
+1.  在手机浏览器中访问 [GitHub Releases](https://github.com/TianssotSiyun/ai-image-generator/releases) 页面，下载最新的 `AI_Image_Generator_Aero.apk` 安装包。
+2.  在手机中安装该 APK（如遇安全拦截，请选择允许安装未知来源应用）。
+3.  打开 App，点击右上角进入 **设置**，配置您的 API Profile。
+4.  保存后即可在手机上随时随地享受创作！
+
+---
+
+## 🛠️ 项目源码结构
+
+*   `/main2.py`：PC 端 Windows 客户端 Python (PySide6) 核心源码。
+*   `/android_native_app/`：手机端 Jetpack Compose + Kotlin 安卓原生工程源码。
