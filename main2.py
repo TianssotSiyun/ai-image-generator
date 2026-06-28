@@ -1606,14 +1606,13 @@ class MainWindow(QMainWindow):
                     border: 1px solid rgba(160, 100, 240, 120); 
                     color: #f0e6ff; 
                 }}
-                QDialog {{
-                    background-color: rgba(30, 20, 40, 255);
-                }}
-                QMessageBox {{
-                    background-color: rgba(30, 20, 40, 255);
+                QDialog, QMessageBox {{
+                    background-color: rgb(30, 20, 40);
+                    border: 1px solid rgba(160, 100, 240, 120);
                 }}
                 QMessageBox QLabel {{
                     color: #f0e6ff;
+                    background: transparent;
                 }}
                 QMenu::item {{
                     padding: 6px 20px;
@@ -1725,14 +1724,13 @@ class MainWindow(QMainWindow):
                     background-color: rgba(150, 220, 255, 200);
                     color: #004d40;
                 }}
-                QDialog {{
+                QDialog, QMessageBox {{
                     background-color: #f0f8ff;
-                }}
-                QMessageBox {{
-                    background-color: #f0f8ff;
+                    border: 1px solid #003b59;
                 }}
                 QMessageBox QLabel {{
                     color: #003b59;
+                    background: transparent;
                 }}
             """)
             self.set_native_titlebar_color(dark=False)
