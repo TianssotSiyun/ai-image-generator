@@ -161,18 +161,39 @@ object NetworkManager {
                     if (choiceObj.has("message")) {
                         val content = choiceObj.getJSONObject("message").getString("content")
                         if (content.isNotEmpty()) {
-                            // 1. Safe URL extraction: split words first to prevent ReDoS on huge base64 strings
-                            val words = content.split(Regex("\\s+"))
+                            // 1. Safe URL extraction: scan for http:// or https:// (O(N) time, no ReDoS)
                             var foundUrl: String? = null
-                            for (word in words) {
-                                val cleanWord = word.trim('(', ')', '[', ']', '{', '}', '"', '\'', '<', '>', '*')
-                                if (cleanWord.startsWith("http://", ignoreCase = true) || cleanWord.startsWith("https://", ignoreCase = true)) {
-                                    val cleanLower = cleanWord.lowercase()
-                                    if (cleanLower.endsWith(".png") || cleanLower.endsWith(".jpg") || cleanLower.endsWith(".jpeg") || cleanLower.endsWith(".webp") || cleanLower.endsWith(".gif")) {
-                                        foundUrl = cleanWord
+                            var idx = 0
+                            while (true) {
+                                val p1 = content.indexOf("http://", idx, ignoreCase = true)
+                                val p2 = content.indexOf("https://", idx, ignoreCase = true)
+                                if (p1 == -1 && p2 == -1) break
+                                val startPos = if (p1 == -1) p2 else if (p2 == -1) p1 else minOf(p1, p2)
+                                
+                                var endPos = startPos
+                                val terminators = charArrayOf(' ', ')', ']', '"', '\'', '>', '\n', '\r', '}', '{')
+                                while (endPos < content.length && content[endPos] !in terminators) {
+                                    endPos++
+                                }
+                                
+                                var url = content.substring(startPos, endPos).trim()
+                                val trailingPunc = charArrayOf('.', ',', ';', '?', '!')
+                                while (url.isNotEmpty() && url.last() in trailingPunc) {
+                                    val urlLower = url.lowercase()
+                                    if (urlLower.endsWith(".png") || urlLower.endsWith(".jpg") || urlLower.endsWith(".jpeg") || urlLower.endsWith(".webp") || urlLower.endsWith(".gif")) {
+                                        break
+                                    }
+                                    url = url.substring(0, url.length - 1)
+                                }
+                                
+                                if (url.isNotEmpty()) {
+                                    val urlLower = url.lowercase()
+                                    if (urlLower.endsWith(".png") || urlLower.endsWith(".jpg") || urlLower.endsWith(".jpeg") || urlLower.endsWith(".webp") || urlLower.endsWith(".gif")) {
+                                        foundUrl = url
                                         break
                                     }
                                 }
+                                idx = endPos
                             }
                             if (!foundUrl.isNullOrEmpty()) {
                                 extractedList.add("url:$foundUrl")

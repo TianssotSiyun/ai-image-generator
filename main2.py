@@ -490,14 +490,35 @@ class ImageGenerateThread(QThread):
                         if not content:
                             continue
                             
-                        # 1. Safely extract URLs from content by splitting words first (avoids ReDoS on huge strings)
-                        words = content.split()
-                        for word in words:
-                            # Clean surrounding quotes/brackets from markdown urls
-                            clean_word = word.strip('()[]{}""\'\'<>*')
-                            if clean_word.startswith(("http://", "https://")):
-                                if any(ext in clean_word.lower() for ext in [".png", ".jpg", ".jpeg", ".webp", ".gif"]):
-                                    extracted_images.append((clean_word, None))
+                        # 1. Safely extract URLs from content by scanning for http:// or https:// (O(N) time, no ReDoS)
+                        idx = 0
+                        while True:
+                            p1 = content.find("http://", idx)
+                            p2 = content.find("https://", idx)
+                            if p1 == -1 and p2 == -1:
+                                break
+                            elif p1 == -1:
+                                start_pos = p2
+                            elif p2 == -1:
+                                start_pos = p1
+                            else:
+                                start_pos = min(p1, p2)
+                                
+                            end_pos = start_pos
+                            while end_pos < len(content) and content[end_pos] not in (' ', ')', ']', '"', '\'', '>', '\n', '\r', '}', '{'):
+                                end_pos += 1
+                                
+                            url = content[start_pos:end_pos].strip()
+                            while url and url[-1] in ('.', ',', ';', '?', '!'):
+                                if url[-4:].lower() in (".png", ".jpg", ".gif") or url[-5:].lower() == ".jpeg":
+                                    break
+                                url = url[:-1]
+                                
+                            if url:
+                                if any(ext in url.lower() for ext in [".png", ".jpg", ".jpeg", ".webp", ".gif"]):
+                                    if (url, None) not in extracted_images:
+                                        extracted_images.append((url, None))
+                            idx = end_pos
                                     
                         # 2. Extract Base64 encoded images from content (efficiently via string operations)
                         if "data:image" in content and "base64" in content:
